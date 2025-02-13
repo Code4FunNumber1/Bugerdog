@@ -50,7 +50,7 @@ def prep_text(text: str, background_color: tuple[int, int, int], **locations):
             rect.topright = locations["topright"]
         elif location == "center":
          rect.center = locations["center"]
-        return (text_to_return, rect)
+    return (text_to_return, rect)
 
 (points_text, points_rect) = prep_text(f"Burger Points: {burger_points}", ORANGE, topleft=(10, 10))
 
@@ -62,7 +62,7 @@ def prep_text(text: str, background_color: tuple[int, int, int], **locations):
 
 (lives_text, lives_rect) = prep_text(f"Lives: {player_lives}", ORANGE, topright=(WINDOW_WIDTH - 10, 10))
 
-(boost_text, boost_rect) = prep_text(f"Boost: (boost_level)", ORANGE, topright=(WINDOW_WIDTH - 10, 50))
+(boost_text, boost_rect) = prep_text(f"Boost: (boost_level)", ORANGE, topright=(WINDOW_WIDTH + 115, 50))
 
 (game_over_text, game_over_rect) = prep_text(f"FINAL SCORE: {score}", ORANGE, center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT //2))
 
@@ -107,7 +107,7 @@ def move_player():
 
 
     if keys[pygame.K_RIGHT] and player_rect.right < WINDOW_WIDTH:
-        player_velocity += player_rect.x
+        player_rect.x += player_velocity
         player_image = player_image_right
 
     if keys[pygame.K_UP] and player_rect.top > 100:
@@ -125,22 +125,27 @@ def engage_boost(keys):
     global PLAYER_NORMAL_VELOCITY
 
     if keys[pygame.K_SPACE] and boost_level > 0:
+        player_velocity = PLAYER_NORMAL_VELOCITY * 2
         boost_level -= 1
-    else: player_velocity = PLAYER_NORMAL_VELOCITY
+    else:
+        player_velocity = PLAYER_NORMAL_VELOCITY
 
 def move_burger():
-    burger_rect.y + burger_velocity
+    global burger_points
+    burger_rect.y += burger_velocity
     burger_points = int(burger_velocity*(WINDOW_HEIGHT - burger_rect.y + 100))
 
 def handle_miss():
     global burger_rect
     global burger_velocity
     global player_rect
+    global player_lives
     global boost_level
     global WINDOW_WIDTH
     global WINDOW_HEIGHT
+
     if burger_rect.y > WINDOW_HEIGHT:
-        player_rect -= 1
+        player_lives -= 1
         miss_sound.play()
         burger_rect.topleft = (random.randint(0, WINDOW_WIDTH - 32), -BUFFER_DISTANCE)
         burger_velocity = STARTING_BURGER_VELOCITY
@@ -153,6 +158,7 @@ def check_collisions():
     global burger_points
     global burgers_eaten
     global boost_level
+    global burger_velocity
 
     if player_rect.colliderect(burger_rect):
         score += burger_points
@@ -178,9 +184,27 @@ def update_hud():
     boost_text = font.render("Boost: " + str(boost_level), True, ORANGE)
 
 def check_game_over():
-    #TODO: hold till 2025-02-12
-    pass #TODO: (2025-02-10):  remove this when done.
-
+    global game_over_text, is_paused, score, burgers_eaten, player_lives, boost_level, burger_velocity, running
+    if player_lives == 0:
+        game_over_text = font.render(f"FINAL SCORE: {score}", True, ORANGE)
+        display_surface.blit(game_over_text, game_over_rect)
+        display_surface.blit(continue_text, continue_rect)
+        pygame.display.update()
+        pygame.mixer.music.stop()
+        is_paused = True
+        while is_paused:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    score = 0
+                    burgers_eaten = 0
+                    player_lives = PLAYER_STARTING_LIVES
+                    boost_level = STARTING_BOOST_LEVEL
+                    burger_velocity = STARTING_BURGER_VELOCITY
+                    pygame.mixer.music.play()
+                    is_paused = False
+                if event.type == pygame.QUIT:
+                    is_paused = False
+                    running = False
 
 def display_hud():
     global display_surface
@@ -199,3 +223,16 @@ def display_hud():
 def handle_clock():
     pygame.display.update()
     clock.tick(FPS)
+
+while running:
+    check_quit()
+    move_player()
+    move_burger()
+    handle_miss()
+    check_collisions()
+    update_hud()
+    display_hud()
+    check_game_over()
+    handle_clock()
+
+pygame.quit()
